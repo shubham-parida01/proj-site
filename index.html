@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>40 — Coercion-Aware Payment Risk Engine</title>
+<style>
+  :root{
+    --bg-deep:#0A0C10;
+    --bg-surface:#10141B;
+    --bg-card:#161B22;
+    --bg-card-hover:#1C2129;
+    --border-muted:#30363D;
+    --border-active:#484F58;
+
+    --text-primary:#E6EDF3;
+    --text-secondary:#8B949E;
+    --text-tertiary:#6E7681;
+
+    --docker-blue:#2496ED;
+    --desktop-teal:#30D5C8;
+    --postgres-purple:#8B7FD6;
+    --accent-glow:rgba(36,150,237,0.15);
+
+    --success:#2EA043;
+    --info:#388BFD;
+    --warning:#D29922;
+
+    --hl-green:#7ee787;
+    --hl-blue:#79c0ff;
+    --hl-amber:#d29922;
+    --hl-purple:#d2a8ff;
+    --hl-gray:#8b949e;
+
+    --radius-md:12px;
+    --radius-lg:16px;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto;}
+    *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;}
+  }
+
+  body{
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    font-family:'Inter', system-ui, -apple-system, sans-serif;
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  ::selection{ background:var(--accent-glow); color:var(--text-primary); }
+
+  a{ color:inherit; }
+
+  code, .mono{ font-family:'JetBrains Mono', monospace; }
+
+  /* Scroll progress bar */
+  #progress-bar{
+    position:fixed; top:0; left:0; height:3px; width:0%;
+    background:var(--docker-blue);
+    z-index:1000;
+    transition:width 0.1s ease;
+  }
+
+  .app-container{
+    display:flex;
+    max-width:1400px;
+    margin:0 auto;
+  }
+
+  /* Sidebar */
+  aside.sidebar{
+    display:none;
+    width:280px;
+    flex-shrink:0;
+    position:sticky;
+    top:0;
+    height:100vh;
+    overflow-y:auto;
+    background:var(--bg-surface);
+    border-right:1px solid var(--border-muted);
+    padding:2rem 1.25rem;
+  }
+  @media (min-width:1024px){
+    aside.sidebar{ display:block; }
+  }
+
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:2rem;
+    padding-bottom:1.25rem;
+    border-bottom:1px solid var(--border-muted);
+  }
+  .brand-mark{
+    width:34px; height:34px; border-radius:9px;
+    background:var(--accent-glow);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--docker-blue); font-weight:800; font-family:'JetBrains Mono',monospace; font-size:15px;
+    flex-shrink:0;
+  }
+  .brand-text{ font-weight:700; font-size:15px; letter-spacing:-0.01em; }
+  .brand-sub{ font-size:11px; color:var(--text-tertiary); margin-top:1px; }
+
+  nav.side-nav ul{ list-style:none; display:flex; flex-direction:column; gap:8px; }
+  nav.side-nav a{
+    display:block;
+    font-size:14px; font-weight:500;
+    color:var(--text-secondary);
+    text-decoration:none;
+    padding:8px 12px;
+    border-radius:8px;
+    transition:background 0.2s ease, color 0.2s ease;
+  }
+  nav.side-nav a:hover{ background:var(--bg-card); color:var(--text-primary); }
+  nav.side-nav a.active{ background:var(--accent-glow); color:var(--docker-blue); }
+  .nav-group-label{
+    font-size:11px; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--text-tertiary); font-weight:600;
+    margin:20px 0 8px 12px;
+  }
+  .nav-group-label:first-child{ margin-top:0; }
+
+  /* Content */
+  main.guide{
+    flex:1;
+    min-width:0;
+    padding:4rem 0;
+  }
+  .wrapper{ max-width:800px; margin:0 auto; padding:0 1.5rem; }
+
+  section{ scroll-margin-top:2rem; margin-bottom:5rem; }
+
+  .hero-badge{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px;
+    background:var(--accent-glow); color:var(--docker-blue);
+    padding:4px 12px; border-radius:99px;
+    margin-bottom:1.5rem;
+  }
+  .hero-badge .dot{ width:6px; height:6px; border-radius:50%; background:var(--docker-blue); }
+
+  h1{
+    font-size:2.5rem; font-weight:800; letter-spacing:-0.02em;
+    line-height:1.15;
+    background:linear-gradient(180deg, var(--text-primary), var(--text-secondary));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    margin-bottom:1.25rem;
+  }
+  .hero-desc{
+    font-size:1.1rem; font-weight:400; color:var(--text-secondary);
+    max-width:600px;
+  }
+  .hero-meta{
+    margin-top:2rem; display:flex; gap:1.5rem; flex-wrap:wrap;
+  }
+  .hero-meta-item{
+    font-size:13px; color:var(--text-tertiary);
+    display:flex; align-items:center; gap:6px;
+  }
+  .hero-meta-item strong{ color:var(--text-secondary); font-weight:600; }
+
+  h2.section-title{
+    font-size:1.7rem; font-weight:700; letter-spacing:-0.01em;
+    margin-bottom:0.5rem;
+    display:flex; align-items:center; gap:12px;
+  }
+  .section-eyebrow{
+    font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--text-tertiary); margin-bottom:0.75rem;
+  }
+  .section-intro{
+    color:var(--text-secondary); font-size:1rem; max-width:640px; margin-bottom:2rem;
+  }
+
+  p{ color:var(--text-secondary); margin-bottom:1rem; }
+  p:last-child{ margin-bottom:0; }
+  strong{ color:var(--text-primary); font-weight:600; }
+
+  /* Phase header */
+  .phase-header{
+    display:flex; align-items:center; gap:14px;
+    padding-bottom:1rem; margin-bottom:1.5rem;
+    border-bottom:1px solid var(--border-muted);
+  }
+  .phase-icon{
+    width:40px; height:40px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px;
+    flex-shrink:0;
+  }
+  .phase-title{ font-size:1.5rem; font-weight:700; }
+  .phase-sub{ font-size:0.85rem; color:var(--text-tertiary); margin-top:2px; }
+
+  /* Step card */
+  .step-card{
+    position:relative;
+    background:var(--bg-card);
+    border:1px solid var(--border-muted);
+    border-radius:var(--radius-lg);
+    padding:2rem;
+    margin-bottom:1.25rem;
+    overflow:hidden;
+    opacity:0; transform:translateY(10px);
+    animation:fadeIn 0.5s ease forwards;
+  }
+  .step-card:hover{
+    border-color:var(--border-active);
+    box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  }
+  .step-card{ transition:border-color 0.2s ease, box-shadow 0.3s ease; }
+  .step-num{
+    position:absolute; top:0.25rem; right:1rem;
+    font-size:4rem; font-weight:900; color:var(--bg-deep);
+    line-height:1; pointer-events:none; user-select:none;
+  }
+  .step-label{ font-size:1.1rem; font-weight:600; margin-bottom:6px; position:relative; }
+  .step-sub{ font-size:0.95rem; color:var(--text-secondary); position:relative; }
+
+  @keyframes fadeIn{
+    from{ opacity:0; transform:translateY(10px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  /* Code container */
+  .code-container{
+    background:#0d1117;
+    border:1px solid var(--border-muted);
+    border-radius:var(--radius-md);
+    overflow:hidden;
+    margin:1.5rem 0;
+  }
+  .code-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px;
+    border-bottom:1px solid var(--border-muted);
+  }
+  .traffic-dots{ display:flex; gap:6px; }
+  .traffic-dots span{ width:10px; height:10px; border-radius:50%; display:block; }
+  .dot-red{ background:#ff5f56; } .dot-yellow{ background:#ffbd2e; } .dot-green{ background:#27c93f; }
+  .code-filename{ font-size:12px; color:var(--text-tertiary); font-family:'JetBrains Mono',monospace; }
+  .copy-btn{
+    background:transparent; border:1px solid var(--border-muted);
+    color:var(--text-secondary); font-size:11px; font-family:'JetBrains Mono',monospace;
+    padding:4px 10px; border-radius:6px; cursor:pointer;
+    transition:border-color 0.2s ease, color 0.2s ease;
+  }
+  .copy-btn:hover{ border-color:var(--border-active); color:var(--text-primary); }
+  .copy-btn.copied{ color:var(--success); border-color:var(--success); }
+  pre.code-block{
+    font-family:'JetBrains Mono',monospace; font-size:13px; line-height:1.7;
+    color:var(--text-secondary);
+    padding:1.25rem; overflow-x:auto;
+    white-space:pre; 
+  }
+  .hl-green{ color:var(--hl-green); }
+  .hl-blue{ color:var(--hl-blue); }
+  .hl-amber{ color:var(--hl-amber); }
+  .hl-purple{ color:var(--hl-purple); }
+  .hl-gray{ color:var(--hl-gray); }
+
+  /* Callouts */
+  .callout{
+    display:flex; gap:12px; align-items:flex-start;
+    border-radius:var(--radius-md);
+    padding:1rem 1.25rem;
+    margin:1.5rem 0;
+    font-size:0.95rem;
+  }
+  .callout-icon{ flex-shrink:0; font-size:1.1rem; line-height:1.5; }
+  .callout p{ margin:0; color:var(--text-primary); }
+  .callout-info{ background:rgba(56,139,253,0.1); border:1px solid rgba(56,139,253,0.25); }
+  .callout-success{ background:rgba(46,160,67,0.1); border:1px solid rgba(46,160,67,0.25); }
+  .callout-warning{ background:rgba(210,153,34,0.1); border:1px solid rgba(210,153,34,0.25); }
+  .callout-open{ background:rgba(139,127,214,0.1); border:1px solid rgba(139,127,214,0.3); }
+
+  /* tags */
+  .tag{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;
+    padding:3px 10px; border-radius:99px;
+    margin-right:8px; margin-bottom:8px;
+  }
+  .tag-confirmed{ background:rgba(46,160,67,0.12); color:var(--success); border:1px solid rgba(46,160,67,0.3); }
+  .tag-assumption{ background:rgba(210,153,34,0.12); color:var(--warning); border:1px solid rgba(210,153,34,0.3); }
+  .tag-open{ background:rgba(139,127,214,0.12); color:var(--postgres-purple); border:1px solid rgba(139,127,214,0.3); }
+  .tag-risk{ background:rgba(255,95,86,0.12); color:#ff8a80; border:1px solid rgba(255,95,86,0.3); }
+
+  /* grid of cards for problem/approach etc */
+  .card-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1.5rem; }
+  @media (max-width:640px){ .card-grid{ grid-template-columns:1fr; } }
+  .mini-card{
+    background:var(--bg-card); border:1px solid var(--border-muted); border-radius:var(--radius-md);
+    padding:1.25rem;
+  }
+  .mini-card h4{ font-size:0.95rem; font-weight:600; margin-bottom:6px; color:var(--text-primary); }
+  .mini-card p{ font-size:0.88rem; margin:0; }
+
+  /* Architecture diagram */
+  .arch-diagram{
+    background:var(--bg-card);
+    border:1px solid var(--border-muted);
+    border-radius:var(--radius-lg);
+    padding:1.75rem;
+    margin:1.5rem 0;
+  }
+  .arch-col-title{
+    font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--text-tertiary); margin-bottom:0.9rem;
+    display:flex; align-items:center; gap:8px;
+  }
+  .arch-cols{ display:grid; grid-template-columns:1fr auto 1fr; gap:1.25rem; align-items:stretch; }
+  @media (max-width:720px){ .arch-cols{ grid-template-columns:1fr; } .arch-arrow{ transform:rotate(90deg); margin:0.5rem auto; } }
+  .arch-box{
+    background:var(--bg-deep); border:1px solid var(--border-muted); border-radius:10px;
+    padding:0.85rem 1rem; margin-bottom:0.6rem; font-size:0.85rem;
+  }
+  .arch-box:last-child{ margin-bottom:0; }
+  .arch-box-title{ font-weight:600; color:var(--text-primary); font-size:0.85rem; margin-bottom:2px; }
+  .arch-box-sub{ color:var(--text-tertiary); font-size:0.78rem; }
+  .arch-arrow{
+    display:flex; align-items:center; justify-content:center;
+    color:var(--text-tertiary); font-size:1.4rem;
+  }
+  .arch-flow-label{
+    text-align:center; font-size:11px; color:var(--text-tertiary); margin-top:0.5rem; font-family:'JetBrains Mono',monospace;
+  }
+
+  details.arch-detail{
+    margin-top:1.5rem; background:var(--bg-card); border:1px solid var(--border-muted); border-radius:var(--radius-md);
+    overflow:hidden;
+  }
+  details.arch-detail summary{
+    cursor:pointer; padding:1rem 1.25rem; font-weight:600; font-size:0.9rem;
+    display:flex; align-items:center; justify-content:between; gap:8px;
+    list-style:none; user-select:none;
+  }
+  details.arch-detail summary::-webkit-details-marker{ display:none; }
+  details.arch-detail summary::before{
+    content:'▸'; display:inline-block; margin-right:8px; color:var(--docker-blue);
+    transition:transform 0.2s ease;
+  }
+  details.arch-detail[open] summary::before{ transform:rotate(90deg); }
+  details.arch-detail .arch-detail-body{ padding:0 1.25rem 1.25rem; }
+
+  /* Table */
+  table.data-table{ width:100%; border-collapse:collapse; margin:1.25rem 0; font-size:0.88rem; }
+  table.data-table th, table.data-table td{
+    text-align:left; padding:10px 12px; border-bottom:1px solid var(--border-muted);
+  }
+  table.data-table th{ color:var(--text-tertiary); font-weight:600; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em; }
+  table.data-table td{ color:var(--text-secondary); }
+  table.data-table td strong{ color:var(--text-primary); }
+
+  /* Open questions list */
+  .question-card{
+    background:var(--bg-card); border:1px solid var(--border-muted); border-radius:var(--radius-md);
+    padding:1.25rem 1.5rem; margin-bottom:1rem;
+    display:flex; gap:1rem; align-items:flex-start;
+  }
+  .question-num{
+    font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--postgres-purple);
+    font-size:0.9rem; flex-shrink:0; width:1.5rem;
+  }
+  .question-body h4{ font-size:0.95rem; font-weight:600; margin-bottom:4px; color:var(--text-primary); }
+  .question-body p{ font-size:0.88rem; margin:0; }
+  .question-status{
+    font-size:11px; color:var(--text-tertiary); margin-top:8px; font-family:'JetBrains Mono',monospace;
+  }
+
+  /* Roadmap */
+  .roadmap-item{
+    display:flex; gap:1rem; padding:1rem 0; border-bottom:1px solid var(--border-muted);
+  }
+  .roadmap-item:last-child{ border-bottom:none; }
+  .roadmap-phase{
+    font-family:'JetBrains Mono',monospace; font-size:0.78rem; color:var(--text-tertiary);
+    width:90px; flex-shrink:0; padding-top:2px;
+  }
+  .roadmap-body h4{ font-size:0.92rem; font-weight:600; margin-bottom:3px; }
+  .roadmap-body p{ font-size:0.86rem; margin:0; }
+
+  footer{
+    text-align:center; padding:3rem 1.5rem 4rem; color:var(--text-tertiary); font-size:0.85rem;
+    border-top:1px solid var(--border-muted); margin-top:2rem;
+  }
+</style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<div class="app-container">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">40</div>
+      <div>
+        <div class="brand-text">Project 40</div>
+        <div class="brand-sub">Coercion-aware risk engine</div>
+      </div>
+    </div>
+    <nav class="side-nav">
+      <div class="nav-group-label">Overview</div>
+      <ul>
+        <li><a href="#problem">The problem</a></li>
+        <li><a href="#understanding">Current understanding</a></li>
+        <li><a href="#approach">Our approach</a></li>
+      </ul>
+      <div class="nav-group-label">System</div>
+      <ul>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#how-it-works">How it works</a></li>
+        <li><a href="#data">Data strategy</a></li>
+      </ul>
+      <div class="nav-group-label">Status</div>
+      <ul>
+        <li><a href="#figured-out">What we've figured out</a></li>
+        <li><a href="#uncertain">What we're uncertain about</a></li>
+        <li><a href="#risks">Risks</a></li>
+      </ul>
+      <div class="nav-group-label">Forward</div>
+      <ul>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="#questions">Open questions</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="guide">
+    <div class="wrapper">
+
+      <!-- HERO -->
+      <section id="hero">
+        <div class="hero-badge"><span class="dot"></span> Design document · living draft</div>
+        <h1>40 is a payment risk engine that notices when you're being pressured, not just when a transaction looks odd.</h1>
+        <p class="hero-desc">Most fraud detection watches the transaction. 40 also watches the moment around it — a new device, an active call, an unfamiliar payee, a rushed high-value transfer — and steps in with a warning before money moves, without getting in the way of a payment you actually meant to make.</p>
+        <div class="hero-meta">
+          <div class="hero-meta-item"><strong>Stage:</strong> architecture &amp; data design</div>
+          <div class="hero-meta-item"><strong>Core idea:</strong> on-device scoring, distilled from a heavier server-side model</div>
+          <div class="hero-meta-item"><strong>Status:</strong> 5 open decisions below</div>
+        </div>
+      </section>
+
+      <!-- PROBLEM -->
+      <section id="problem">
+        <div class="section-eyebrow">Why this exists</div>
+        <h2 class="section-title">The problem</h2>
+        <p class="section-intro">Coercion-based fraud — a scammer on the phone walking a victim through an "urgent" transfer — doesn't look anomalous by the numbers most fraud systems watch. The amount can be normal. The account can be the victim's own, verified, familiar. What's different is the situation the person is in when they hit send.</p>
+
+        <div class="card-grid">
+          <div class="mini-card">
+            <h4>What existing systems catch</h4>
+            <p>Statistical outliers: an unusual amount, an unfamiliar payee, a spike in transaction frequency. Well-suited to card-fraud patterns, less suited to a victim knowingly authorizing a payment under pressure.</p>
+          </div>
+          <div class="mini-card">
+            <h4>What 40 tries to add</h4>
+            <p>Situational signals around the transaction — device change, an active call, urgency cues — combined with transaction anomalies, to catch the pattern of coercion, not just the pattern of the payment itself.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <p><strong>Named tension, not yet resolved:</strong> the same design goal — warn on coercion without blocking legitimate urgent payments — is the classic hard problem in fraud systems. A threshold tight enough to catch real coercion will also flag some genuine emergencies. See <a href="#uncertain">What we're uncertain about</a>.</p>
+        </div>
+      </section>
+
+      <!-- CURRENT UNDERSTANDING -->
+      <section id="understanding">
+        <div class="section-eyebrow">Where we stand</div>
+        <h2 class="section-title">Current understanding</h2>
+        <p class="section-intro">What we currently believe, in plain terms, before any code is written.</p>
+
+        <div class="step-card" style="animation-delay:0.05s">
+          <div class="step-label">A transaction carries two kinds of signal</div>
+          <div class="step-sub">One is <strong>what</strong> is being paid — amount, payee, frequency, account history. The other is <strong>how</strong> it's being paid — from a new or unfamiliar device, while on an active call, unusually fast after the payee was added. 40 is built on the belief that the second kind matters as much as the first for catching coercion specifically.</div>
+        </div>
+
+        <div class="step-card" style="animation-delay:0.1s">
+          <div class="step-label">Scoring has to happen close to the user, not just in a data center</div>
+          <div class="step-sub">A warning that arrives after the money has left isn't a warning. This pushes toward on-device or near-device inference — fast, and without needing to ship raw behavioral data off the phone for every single transaction.</div>
+        </div>
+
+        <div class="step-card" style="animation-delay:0.15s">
+          <div class="step-label">A warning is not a block</div>
+          <div class="step-sub">The system's job is to interrupt and inform, then let the person decide. This is a deliberate choice — blocking legitimate urgent payments causes its own harm, and erodes trust in the system fast enough that people start ignoring or disabling it.</div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <p>We don't yet have real labeled coercion data — no dataset tags a transaction as "victim was being coerced." That signal is being <strong>constructed</strong>, not observed, from documented scam patterns. This is addressed directly in <a href="#data">Data strategy</a> rather than glossed over.</p>
+        </div>
+      </section>
+
+      <!-- APPROACH -->
+      <section id="approach">
+        <div class="section-eyebrow">The plan</div>
+        <h2 class="section-title">Our approach</h2>
+        <p class="section-intro">A teacher-student split: a heavy, unsupervised model does the hard work of finding structure in transaction and behavioral data once, offline. A small model learns to imitate its judgment, cheaply, in real time, on the device.</p>
+
+        <div class="card-grid">
+          <div class="mini-card">
+            <h4>Teacher — server side</h4>
+            <p>An Isolation Forest + Autoencoder ensemble trained on a merged, feature-engineered dataset. Produces an anomaly score per transaction. Runs offline, not in the real-time path.</p>
+          </div>
+          <div class="mini-card">
+            <h4>Student — on device</h4>
+            <p>A small model (compact MLP or shallow tree) trained to reproduce the teacher's scores using only the features available locally on the phone. Runs in the real-time path, at the moment of payment.</p>
+          </div>
+        </div>
+
+        <p style="margin-top:1.25rem">The teacher is retrained periodically as institutions report back which flagged transactions were real fraud and which were false alarms. A new student is distilled from the updated teacher and shipped to devices. <span class="tag tag-assumption">Assumption</span> — the exact shipping mechanism (in-app update vs. background model download) hasn't been decided; see <a href="#uncertain">open items</a>.</p>
+      </section>
+
+      <!-- ARCHITECTURE -->
+      <section id="architecture">
+        <div class="section-eyebrow">System design</div>
+        <h2 class="section-title">Architecture</h2>
+        <p class="section-intro">The idea worth understanding is the split itself: most of the thinking happens on the phone; only a flagged summary — not raw transaction detail — travels to the institution, and only when a transaction is actually flagged for review.</p>
+
+        <div class="arch-diagram">
+          <div class="arch-cols">
+            <div>
+              <div class="arch-col-title">📱 On the device</div>
+              <div class="arch-box">
+                <div class="arch-box-title">Feature extractor</div>
+                <div class="arch-box-sub">transaction + device + behavioral signals, computed locally</div>
+              </div>
+              <div class="arch-box">
+                <div class="arch-box-title">Student model</div>
+                <div class="arch-box-sub">scores the transaction in real time (ONNX / TFLite)</div>
+              </div>
+              <div class="arch-box">
+                <div class="arch-box-title">Warning UI</div>
+                <div class="arch-box-sub">plain-language reason, confirm or cancel</div>
+              </div>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div>
+              <div class="arch-col-title">🏦 At the institution</div>
+              <div class="arch-box">
+                <div class="arch-box-title">Review queue</div>
+                <div class="arch-box-sub">flagged cases only, minimal feature summary</div>
+              </div>
+              <div class="arch-box">
+                <div class="arch-box-title">Teacher retraining</div>
+                <div class="arch-box-sub">Isolation Forest + Autoencoder, on aggregated feedback</div>
+              </div>
+              <div class="arch-box">
+                <div class="arch-box-title">Model distribution</div>
+                <div class="arch-box-sub">updated student shipped back to devices</div>
+              </div>
+            </div>
+          </div>
+          <div class="arch-flow-label">only flagged transactions cross this boundary — not the full transaction stream</div>
+        </div>
+
+        <div class="callout callout-open">
+          <div class="callout-icon">🔍</div>
+          <p><strong>Open, not assumed:</strong> exactly what crosses that boundary — score only, score plus a short feature summary, or something else — is the single most important undecided piece of this design. It determines whether "privacy-preserving" is a real property of the system or just a direction we're heading in. Tracked in <a href="#questions">open questions</a>.</p>
+        </div>
+
+        <details class="arch-detail">
+          <summary>Full pipeline, including data sources and offline training</summary>
+          <div class="arch-detail-body">
+            <div class="code-container">
+              <div class="code-header">
+                <div class="traffic-dots"><span class="dot-red"></span><span class="dot-yellow"></span><span class="dot-green"></span></div>
+                <div class="code-filename">architecture.txt</div>
+                <button class="copy-btn" data-copy-target="arch-full">Copy</button>
+              </div>
+              <pre class="code-block" id="arch-full"><span class="hl-gray">[Offline, historical — not in the live path]</span>
+<span class="hl-blue">ULB Fraud dataset</span>  +  <span class="hl-blue">IEEE-CIS dataset</span>  +  <span class="hl-blue">PaySim dataset</span>
+        │ mapped to one unified feature schema
+        │ missing fields (device, call-state, coercion flags)
+        │ backfilled synthetically — <span class="hl-amber">clearly tagged as synthetic</span>
+        ▼
+<span class="hl-green">Combined training set</span>
+
+        ▼
+<span class="hl-purple">Teacher: Isolation Forest + Autoencoder</span>  (unsupervised, server-side)
+        │ produces anomaly score per transaction
+        ▼
+<span class="hl-purple">Distillation job</span> — trains a small model to imitate teacher's scores
+        ▼
+<span class="hl-green">Student model</span>  →  exported to ONNX / TFLite  →  shipped to devices
+
+<span class="hl-gray">[Live, on-device]</span>
+Transaction initiated → local features extracted → student scores it
+        │
+        │ risk_score above threshold?
+        ▼
+Warning shown → user confirms or cancels
+        │
+        │ if flagged as high-risk
+        ▼
+Minimal summary sent to institution review queue  <span class="hl-amber">(exact contents: open)</span>
+        │
+        ▼
+Analyst marks true / false positive → feeds back into next teacher retrain</pre>
+            </div>
+            <p style="font-size:0.85rem">Boxes shown here follow directly from the plan we've discussed. Nothing in this diagram is an invented technical spec — where a mechanism isn't decided (model shipping method, exact review-queue payload), it's marked rather than filled in.</p>
+          </div>
+        </details>
+      </section>
+
+      <!-- HOW IT WORKS -->
+      <section id="how-it-works">
+        <div class="section-eyebrow">Walkthrough</div>
+        <h2 class="section-title">How it works</h2>
+        <p class="section-intro">Three phases, from the moment a payment is initiated to the moment the system gets a little smarter because of it.</p>
+
+        <div class="phase-header">
+          <div class="phase-icon" style="background:rgba(36,150,237,0.15); color:var(--docker-blue);">1</div>
+          <div>
+            <div class="phase-title">On-device detection</div>
+            <div class="phase-sub">Every transaction, scored locally, in real time</div>
+          </div>
+        </div>
+        <div class="step-card" style="animation-delay:0.05s">
+          <span class="step-num">1</span>
+          <div class="step-label">Local feature extraction</div>
+          <div class="step-sub">At the moment a payment is initiated, the device computes transaction features (amount, payee, frequency) alongside situational signals — is this a new device, is there an active call, has this payee only just been added. <span class="tag tag-assumption">Assumption</span> device- and call-state signals require explicit permission at onboarding; this consent flow is not yet designed. See <a href="#questions">Q3</a>.</div>
+        </div>
+        <div class="step-card" style="animation-delay:0.1s">
+          <span class="step-num">2</span>
+          <div class="step-label">The student model scores it</div>
+          <div class="step-sub">The distilled on-device model produces a risk score from those features, without a network call, in well under the time a payment normally takes to process.</div>
+        </div>
+
+        <div class="phase-header" style="margin-top:2.5rem">
+          <div class="phase-icon" style="background:rgba(48,213,200,0.15); color:var(--desktop-teal);">2</div>
+          <div>
+            <div class="phase-title">Warning &amp; confirmation</div>
+            <div class="phase-sub">Only when risk crosses a threshold</div>
+          </div>
+        </div>
+        <div class="step-card" style="animation-delay:0.05s">
+          <span class="step-num">3</span>
+          <div class="step-label">A plain-language warning appears</div>
+          <div class="step-sub">Not a generic "suspicious activity" message — a specific reason tied to what triggered the score, e.g. "new device + call in progress + first-time payee." <span class="tag tag-open">Open</span> the exact method for surfacing this explanation from a distilled model hasn't been chosen; see <a href="#questions">Q1</a> region.</div>
+        </div>
+        <div class="step-card" style="animation-delay:0.1s">
+          <span class="step-num">4</span>
+          <div class="step-label">The person decides</div>
+          <div class="step-sub">Confirm and the payment proceeds. Cancel and it doesn't. The system never makes this decision unilaterally — it interrupts, it doesn't override.</div>
+        </div>
+
+        <div class="phase-header" style="margin-top:2.5rem">
+          <div class="phase-icon" style="background:rgba(139,127,214,0.15); color:var(--postgres-purple);">3</div>
+          <div>
+            <div class="phase-title">Institutional review &amp; retraining</div>
+            <div class="phase-sub">The feedback loop that makes the model better over time</div>
+          </div>
+        </div>
+        <div class="step-card" style="animation-delay:0.05s">
+          <span class="step-num">5</span>
+          <div class="step-label">Flagged cases reach a review queue</div>
+          <div class="step-sub">Bank or institution staff mark whether a flagged transaction was genuine fraud, genuine coercion, or a false positive. <span class="tag tag-open">Open</span> the review dashboard itself is not yet designed as a component — see <a href="#questions">Q5</a>.</div>
+        </div>
+        <div class="step-card" style="animation-delay:0.1s">
+          <span class="step-num">6</span>
+          <div class="step-label">The teacher retrains, a new student ships</div>
+          <div class="step-sub">Labeled outcomes feed the next teacher retraining run. A freshly distilled student model is generated and rolled out to devices on some cadence. <span class="tag tag-assumption">Assumption</span> cadence and rollout mechanism undecided.</div>
+        </div>
+      </section>
+
+      <!-- DATA STRATEGY -->
+      <section id="data">
+        <div class="section-eyebrow">Grounding the model</div>
+        <h2 class="section-title">Data strategy</h2>
+        <p class="section-intro">Three real, public fraud datasets are merged into one schema. What none of them contain — coercion and device-behavior signals — is added synthetically, deliberately, and disclosed rather than hidden.</p>
+
+        <table class="data-table">
+          <thead>
+            <tr><th>Source</th><th>Real or synthetic</th><th>Contributes</th><th>Missing</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>ULB Credit Card Fraud</strong></td><td>Real, labeled</td><td>Clean fraud/not-fraud labels, amount, timing</td><td>No device or behavioral fields</td></tr>
+            <tr><td><strong>IEEE-CIS Fraud Detection</strong></td><td>Real, labeled</td><td>Device type, browser, card metadata</td><td>No call-state or coercion-specific signal</td></tr>
+            <tr><td><strong>PaySim</strong></td><td>Synthetic</td><td>Mobile-money-style payment flows, balances</td><td>No device or behavioral fields</td></tr>
+            <tr><td><strong>Coercion augmentation</strong></td><td>Synthetic, rule-based</td><td>Call-active, device-new, urgency flags</td><td>Not observed data — constructed from documented scam patterns</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <p><strong>What this means honestly:</strong> the unsupervised teacher model isn't learning "what coercion looks like" from real examples — it's learning to flag combinations of signals that we, based on documented scam patterns, decided should count as coercion-like. That's a meaningfully different and more limited claim than "the model learned to detect coercion," and the site is stating it plainly rather than implying otherwise.</p>
+        </div>
+
+        <p>Merging three heterogeneous sources risks a model that learns <em>which dataset a row came from</em> rather than genuine fraud signal. A source-prediction sanity check — training a simple classifier to guess origin dataset from features — is planned as a validation step before trusting the merged data. <span class="tag tag-open">Open</span> not yet run.</p>
+      </section>
+
+      <!-- FIGURED OUT -->
+      <section id="figured-out">
+        <div class="section-eyebrow">Established</div>
+        <h2 class="section-title">What we've figured out</h2>
+        <div class="card-grid">
+          <div class="mini-card"><h4>Warn, don't block</h4><p>Confirmed direction — the system interrupts and informs, the person decides.</p></div>
+          <div class="mini-card"><h4>Teacher-student split</h4><p>Confirmed architecture — heavy unsupervised model offline, light distilled model on-device.</p></div>
+          <div class="mini-card"><h4>Real datasets as a base</h4><p>ULB, IEEE-CIS and PaySim identified as the grounding data, with a defined merge schema.</p></div>
+          <div class="mini-card"><h4>Synthetic data is disclosed</h4><p>Coercion signals are constructed, not observed — and the design commits to saying so, not hiding it.</p></div>
+        </div>
+      </section>
+
+      <!-- UNCERTAIN -->
+      <section id="uncertain">
+        <div class="section-eyebrow">Not yet settled</div>
+        <h2 class="section-title">What we're uncertain about</h2>
+        <p class="section-intro">Named directly rather than smoothed over — these are the gaps that would change the design if resolved differently.</p>
+
+        <div class="question-card">
+          <div class="question-num">A</div>
+          <div class="question-body">
+            <h4>What exactly crosses the device-to-institution boundary</h4>
+            <p>Raw transaction, risk score only, or score plus a feature summary — undecided, and it's the crux of whether "privacy-preserving" is a real property of this system.</p>
+          </div>
+        </div>
+        <div class="question-card">
+          <div class="question-num">B</div>
+          <div class="question-body">
+            <h4>Consent for device and call-state signals</h4>
+            <p>These require OS-level permissions distinct from transaction-data consent, and no flow for obtaining them has been designed yet.</p>
+          </div>
+        </div>
+        <div class="question-card">
+          <div class="question-num">C</div>
+          <div class="question-body">
+            <h4>Threshold governance</h4>
+            <p>Who sets the line between "annoying false positive" and "missed real coercion," whether it's global or adaptive per user, and how it gets tuned — not yet defined.</p>
+          </div>
+        </div>
+        <div class="question-card">
+          <div class="question-num">D</div>
+          <div class="question-body">
+            <h4>On-device explainability</h4>
+            <p>The teacher can be explained with SHAP; the distilled on-device student is smaller and less inherently interpretable. How the plain-language warning gets generated from it is unresolved.</p>
+          </div>
+        </div>
+        <div class="question-card">
+          <div class="question-num">E</div>
+          <div class="question-body">
+            <h4>Model update mechanism</h4>
+            <p>How an updated student model actually reaches a device — app-store release, background download, something else — hasn't been decided, and each option has different security implications.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- RISKS -->
+      <section id="risks">
+        <div class="section-eyebrow">Named, not solved</div>
+        <h2 class="section-title">Risks</h2>
+
+        <div class="step-card" style="animation-delay:0.05s">
+          <span class="tag tag-risk">Adversarial adaptation</span>
+          <div class="step-sub" style="margin-top:6px">A scammer who learns the system's triggers can coach a victim around them — "don't mention you're on a call," "wait a day before transferring." Fraud models degrade against an adaptive adversary; this is acknowledged as an ongoing risk, not a solved problem.</div>
+        </div>
+        <div class="step-card" style="animation-delay:0.1s">
+          <span class="tag tag-risk">Data source leakage</span>
+          <div class="step-sub" style="margin-top:6px">Merging three heterogeneous datasets risks the model learning dataset-origin artifacts instead of genuine fraud patterns. A validation check is planned but not yet run.</div>
+        </div>
+        <div class="step-card" style="animation-delay:0.15s">
+          <span class="tag tag-risk">Regulatory alignment unverified</span>
+          <div class="step-sub" style="margin-top:6px">Existing regulatory guidance on fraud alerting for financial institutions likely applies here and hasn't been reviewed against this design yet.</div>
+        </div>
+      </section>
+
+      <!-- ROADMAP -->
+      <section id="roadmap">
+        <div class="section-eyebrow">What's next</div>
+        <h2 class="section-title">Roadmap</h2>
+
+        <div class="roadmap-item">
+          <div class="roadmap-phase">NOW</div>
+          <div class="roadmap-body"><h4>Resolve the boundary question</h4><p>Decide what data actually leaves the device on a flagged transaction — this gates most of the rest of the build.</p></div>
+        </div>
+        <div class="roadmap-item">
+          <div class="roadmap-phase">NEXT</div>
+          <div class="roadmap-body"><h4>Build the merged dataset + run the leakage check</h4><p>Unify ULB, IEEE-CIS, PaySim into one schema, backfill coercion signals, validate the merge before trusting it.</p></div>
+        </div>
+        <div class="roadmap-item">
+          <div class="roadmap-phase">THEN</div>
+          <div class="roadmap-body"><h4>Train teacher, distill student, benchmark on-device</h4><p>Get real numbers on model size and inference latency — these become concrete claims, not estimates.</p></div>
+        </div>
+        <div class="roadmap-item">
+          <div class="roadmap-phase">LATER</div>
+          <div class="roadmap-body"><h4>Design the warning UI and the review queue</h4><p>Both are real components, not afterthoughts — the warning is the entire user-facing product, and the review queue is what makes the feedback loop real.</p></div>
+        </div>
+      </section>
+
+      <!-- OPEN QUESTIONS -->
+      <section id="questions">
+        <div class="section-eyebrow">Needs a decision</div>
+        <h2 class="section-title">Open questions</h2>
+        <p class="section-intro">Flagged for discussion rather than answered by assumption, because the answer to each would change the architecture, not just a detail.</p>
+
+        <div class="question-card">
+          <div class="question-num">Q1</div>
+          <div class="question-body">
+            <h4>What crosses the device → institution boundary on a flagged transaction?</h4>
+            <p>Raw transaction data, risk score only, or score plus a minimal feature summary? This is the single most important undefined decision in the whole design.</p>
+          </div>
+        </div>
+        <div class="question-card">
+          <div class="question-num">Q2</div>
+          <div class="question-body">
+            <h4>Is this a real product direction or a prototype for presentation?</h4>
+            <p>Changes how much of the above should be framed as "future work" versus "known limitation we're being upfront about."</p>
+          </div>
+        </div>
+        <div class="question-card">
+          <div class="question-num">Q3</div>
+          <div class="question-body">
+            <h4>Should device/call-state consent be designed at all right now?</h4>
+            <p>Or should the system treat those signals as a given input for this stage, with consent handled later?</p>
+          </div>
+        </div>
+        <div class="question-card">
+          <div class="question-num">Q4</div>
+          <div class="question-body">
+            <h4>How transparent should the real-vs-synthetic data split be, publicly?</h4>
+            <p>Shown openly on this site, or kept to an internal-only section?</p>
+          </div>
+        </div>
+        <div class="question-card">
+          <div class="question-num">Q5</div>
+          <div class="question-body">
+            <h4>Is an institution-side review dashboard actually in scope?</h4>
+            <p>Even conceptually — or is that explicitly out of scope for this phase of the project?</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<footer>
+  Project 40 — living design document. Marked assumptions and open questions are intentional, not oversights.
+</footer>
+
+<script>
+  // Scroll progress bar
+  const progressBar = document.getElementById('progress-bar');
+  function updateProgress(){
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+    progressBar.style.width = pct + '%';
+  }
+  window.addEventListener('scroll', updateProgress, { passive:true });
+  updateProgress();
+
+  // Scroll-spy nav
+  const sections = document.querySelectorAll('main section[id]');
+  const navLinks = document.querySelectorAll('nav.side-nav a');
+  const linkMap = {};
+  navLinks.forEach(link => { linkMap[link.getAttribute('href').slice(1)] = link; });
+
+  const spyObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const id = entry.target.getAttribute('id');
+      const link = linkMap[id];
+      if(!link) return;
+      if(entry.isIntersecting){
+        navLinks.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(s => spyObserver.observe(s));
+
+  // Copy buttons
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-copy-target');
+      const target = document.getElementById(targetId);
+      if(!target) return;
+      const text = target.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 2000);
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
