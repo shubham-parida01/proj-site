@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>40 — Coercion-Aware Payment Risk Engine</title>
+<title>SOAIDEATHON-S40 — Explainable Real-Time Fraud Shield</title>
 <style>
   :root{
     --bg-deep:#0A0C10;
@@ -399,8 +399,8 @@
     <div class="brand">
       <div class="brand-mark">40</div>
       <div>
-        <div class="brand-text">Project 40</div>
-        <div class="brand-sub">Coercion-aware risk engine</div>
+        <div class="brand-text">SOAIDEATHON-S40</div>
+        <div class="brand-sub">Explainable Real-Time Fraud Shield</div>
       </div>
     </div>
     <nav class="side-nav">
@@ -435,10 +435,11 @@
 
       <!-- HERO -->
       <section id="hero">
-        <div class="hero-badge"><span class="dot"></span> Design document · living draft</div>
-        <h1>40 is a payment risk engine that notices when you're being pressured, not just when a transaction looks odd.</h1>
-        <p class="hero-desc">Most fraud detection watches the transaction. 40 also watches the moment around it — a new device, an active call, an unfamiliar payee, a rushed high-value transfer — and steps in with a warning before money moves, without getting in the way of a payment you actually meant to make.</p>
+        <div class="hero-badge"><span class="dot"></span> SOAIDEATHON-S40 · design document · living draft</div>
+        <h1>Explainable Real-Time Fraud Shield for UPI, voice phishing and social engineering.</h1>
+        <p class="hero-desc">Most fraud detection watches the transaction. This system also watches the moment around it — a new device, an active call, an unfamiliar payee, a rushed high-value UPI transfer — and steps in with an explainable warning before money moves, without getting in the way of a payment someone genuinely needs to make urgently.</p>
         <div class="hero-meta">
+          <div class="hero-meta-item"><strong>Track:</strong> SOAIDEATHON-S40</div>
           <div class="hero-meta-item"><strong>Stage:</strong> architecture &amp; data design</div>
           <div class="hero-meta-item"><strong>Core idea:</strong> on-device scoring, distilled from a heavier server-side model</div>
           <div class="hero-meta-item"><strong>Status:</strong> 5 open decisions below</div>
@@ -449,7 +450,7 @@
       <section id="problem">
         <div class="section-eyebrow">Why this exists</div>
         <h2 class="section-title">The problem</h2>
-        <p class="section-intro">Coercion-based fraud — a scammer on the phone walking a victim through an "urgent" transfer — doesn't look anomalous by the numbers most fraud systems watch. The amount can be normal. The account can be the victim's own, verified, familiar. What's different is the situation the person is in when they hit send.</p>
+        <p class="section-intro">Voice phishing and social-engineering fraud — a scammer on the phone walking a victim through an "urgent" UPI transfer — doesn't look anomalous by the numbers most fraud systems watch. The amount can be normal. The account can be the victim's own, verified, familiar, moving over a rail like UPI built for speed. What's different is the situation the person is in when they hit send.</p>
 
         <div class="card-grid">
           <div class="mini-card">
@@ -476,7 +477,7 @@
 
         <div class="step-card" style="animation-delay:0.05s">
           <div class="step-label">A transaction carries two kinds of signal</div>
-          <div class="step-sub">One is <strong>what</strong> is being paid — amount, payee, frequency, account history. The other is <strong>how</strong> it's being paid — from a new or unfamiliar device, while on an active call, unusually fast after the payee was added. 40 is built on the belief that the second kind matters as much as the first for catching coercion specifically.</div>
+          <div class="step-sub">One is <strong>what</strong> is being paid — amount, payee, frequency, account history. The other is <strong>how</strong> it's being paid — from a new or unfamiliar device, while on an active call, unusually fast after the payee was added. SOAIDEATHON-S40 is built on the belief that the second kind matters as much as the first for catching voice phishing and coercion specifically.</div>
         </div>
 
         <div class="step-card" style="animation-delay:0.1s">
@@ -527,7 +528,7 @@
               <div class="arch-col-title">📱 On the device</div>
               <div class="arch-box">
                 <div class="arch-box-title">Feature extractor</div>
-                <div class="arch-box-sub">transaction + device + behavioral signals, computed locally</div>
+                <div class="arch-box-sub">UPI transaction + device change + coercive-interaction + voice-phishing indicators, computed locally</div>
               </div>
               <div class="arch-box">
                 <div class="arch-box-title">Student model</div>
@@ -839,7 +840,7 @@ Analyst marks true / false positive → feeds back into next teacher retrain</pr
 </div>
 
 <footer>
-  Project 40 — living design document. Marked assumptions and open questions are intentional, not oversights.
+  SOAIDEATHON-S40 — Explainable Real-Time Fraud Shield for UPI, Voice Phishing and Social Engineering. Living design document. Marked assumptions and open questions are intentional, not oversights.
 </footer>
 
 <script>
